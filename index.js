@@ -16,41 +16,19 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Manejar preflight OPTIONS
-app.options('*', cors(corsOptions));
-
 // Middleware para parsear JSON
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Validar que las variables de entorno estén configuradas (solo en desarrollo local)
-if (process.env.NODE_ENV !== 'production' && (!process.env.EMAIL_USER || !process.env.EMAIL_PASS)) {
-  console.error('❌ ERROR: Las variables de entorno EMAIL_USER y EMAIL_PASS deben estar configuradas');
-  console.error('📝 En desarrollo local, crea un archivo .env con:');
-  console.error('   EMAIL_USER=tu_correo@gmail.com');
-  console.error('   EMAIL_PASS=tu_contraseña_de_aplicacion');
-  console.error('📝 En Vercel, configura las variables de entorno en el dashboard');
-}
-
-// En producción (Vercel), las variables se configuran en el dashboard
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-  console.warn('⚠️ ADVERTENCIA: Variables de entorno de correo no configuradas');
-}
+// Leer variables de entorno del .env
+const emailUser = process.env.EMAIL_USER?.trim();
+const emailPass = process.env.EMAIL_PASS?.trim()?.replace(/\s/g, '');
 
 // Configuración del transporter de nodemailer
-// Eliminar espacios en blanco de las credenciales (común al copiar desde Google)
-const emailUser = process.env.EMAIL_USER?.trim();
-const emailPass = process.env.EMAIL_PASS?.trim().replace(/\s/g, ''); // Eliminar todos los espacios
-
-// Debug: mostrar información (sin mostrar la contraseña completa)
-console.log('📧 Configuración de correo:');
-console.log(`   Usuario: ${emailUser}`);
-console.log(`   Contraseña: ${emailPass ? emailPass.substring(0, 4) + '****' : 'NO CONFIGURADA'}`);
-
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // true para 465, false para otros puertos
+  secure: false,
   auth: {
     user: emailUser,
     pass: emailPass
@@ -60,22 +38,12 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Verificar la conexión del transporter al iniciar
-transporter.verify(function (error, success) {
-  if (error) {
-    console.error('❌ Error en la configuración del correo:', error.message);
-    console.error('💡 Verifica que EMAIL_USER y EMAIL_PASS estén correctos en el archivo .env');
-  } else {
-    console.log('✅ Configuración de correo verificada correctamente');
-  }
-});
-
 // Endpoint para enviar correo
 app.post('/api/enviar-formulario', async (req, res) => {
   try {
     const { nombreCompleto, edad, ciudadResidencia, numeroWhatsApp, ultimoAnoCursado } = req.body;
 
-    // Validar que todos los campos requeridos estén presentes
+    // Validar campos requeridos
     if (!nombreCompleto || !edad || !ciudadResidencia || !numeroWhatsApp || !ultimoAnoCursado) {
       return res.status(400).json({
         success: false,
@@ -83,10 +51,10 @@ app.post('/api/enviar-formulario', async (req, res) => {
       });
     }
 
-    // Configurar el correo
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: 'gabrielsabtiago176@gmail.com',
+    // Enviar correo
+    const info = await transporter.sendMail({
+      from: emailUser,
+      to: emailUser, // Enviar al mismo correo configurado en EMAIL_USER
       subject: 'Nueva Inscripción - Formulario Educados',
       html: `
         <h2>Nueva Inscripción Recibida</h2>
@@ -99,27 +67,12 @@ app.post('/api/enviar-formulario', async (req, res) => {
           <li><strong>Último año cursado certificado:</strong> ${ultimoAnoCursado}</li>
         </ul>
         <p><em>Fecha de recepción: ${new Date().toLocaleString('es-ES')}</em></p>
-      `,
-      text: `
-        Nueva Inscripción Recibida
-        
-        Nombre completo: ${nombreCompleto}
-        Edad: ${edad}
-        Ciudad de residencia: ${ciudadResidencia}
-        Número de WhatsApp: ${numeroWhatsApp}
-        Último año cursado certificado: ${ultimoAnoCursado}
-        
-        Fecha de recepción: ${new Date().toLocaleString('es-ES')}
       `
-    };
-
-    // Enviar el correo
-    const info = await transporter.sendMail(mailOptions);
+    });
 
     res.json({
       success: true,
-      message: 'Correo enviado correctamente',
-      messageId: info.messageId
+      message: 'Correo enviado correctamente'
     });
 
   } catch (error) {
@@ -132,33 +85,6 @@ app.post('/api/enviar-formulario', async (req, res) => {
   }
 });
 
-// Endpoint de prueba
-app.get('/', (req, res) => {
-  res.json({
-    message: 'API funcionando correctamente',
-    endpoints: {
-      'POST /api/enviar-formulario': 'Envía un correo con los datos del formulario',
-      'GET /api/status': 'Verifica el estado de la configuración de correo'
-    }
-  });
-});
-
-// Endpoint para verificar configuración (sin exponer la contraseña)
-app.get('/api/status', (req, res) => {
-  const emailUser = process.env.EMAIL_USER?.trim();
-  const emailPass = process.env.EMAIL_PASS?.trim();
-  
-  res.json({
-    emailConfigured: !!(emailUser && emailPass),
-    emailUser: emailUser || 'NO CONFIGURADO',
-    emailPassLength: emailPass ? emailPass.length : 0,
-    hasSpaces: emailPass ? emailPass.includes(' ') : false,
-    message: emailUser && emailPass 
-      ? 'Configuración de correo detectada' 
-      : 'Faltan credenciales en el archivo .env'
-  });
-});
-
 // Exportar la app para Vercel
 module.exports = app;
 
@@ -166,6 +92,5 @@ module.exports = app;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`📧 Endpoint disponible: POST http://localhost:${PORT}/api/enviar-formulario`);
   });
 }
