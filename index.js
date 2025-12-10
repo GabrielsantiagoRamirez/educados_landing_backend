@@ -1,21 +1,40 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configurar CORS
+const corsOptions = {
+  origin: '*', // Permite todos los orígenes (en producción puedes especificar tu dominio)
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+
+// Manejar preflight OPTIONS
+app.options('*', cors(corsOptions));
+
 // Middleware para parsear JSON
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Validar que las variables de entorno estén configuradas
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-  console.error('❌ ERROR: Las variables de entorno EMAIL_USER y EMAIL_PASS deben estar configuradas en el archivo .env');
-  console.error('📝 Crea un archivo .env con:');
+// Validar que las variables de entorno estén configuradas (solo en desarrollo local)
+if (process.env.NODE_ENV !== 'production' && (!process.env.EMAIL_USER || !process.env.EMAIL_PASS)) {
+  console.error('❌ ERROR: Las variables de entorno EMAIL_USER y EMAIL_PASS deben estar configuradas');
+  console.error('📝 En desarrollo local, crea un archivo .env con:');
   console.error('   EMAIL_USER=tu_correo@gmail.com');
   console.error('   EMAIL_PASS=tu_contraseña_de_aplicacion');
-  process.exit(1);
+  console.error('📝 En Vercel, configura las variables de entorno en el dashboard');
+}
+
+// En producción (Vercel), las variables se configuran en el dashboard
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  console.warn('⚠️ ADVERTENCIA: Variables de entorno de correo no configuradas');
 }
 
 // Configuración del transporter de nodemailer
@@ -140,8 +159,13 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`📧 Endpoint disponible: POST http://localhost:${PORT}/api/enviar-formulario`);
-});
+// Exportar la app para Vercel
+module.exports = app;
+
+// Iniciar servidor solo si no estamos en Vercel
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`📧 Endpoint disponible: POST http://localhost:${PORT}/api/enviar-formulario`);
+  });
+}
