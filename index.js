@@ -41,10 +41,10 @@ const transporter = nodemailer.createTransport({
 // Endpoint para enviar correo
 app.post('/api/enviar-formulario', async (req, res) => {
   try {
-    const { nombreCompleto, edad, ciudadResidencia, numeroWhatsApp, ultimoAnoCursado } = req.body;
+    const { nombreCompleto, edad, ciudadResidencia, numeroWhatsApp, ultimoAnoCursado, correo } = req.body;
 
     // Validar campos requeridos
-    if (!nombreCompleto || !edad || !ciudadResidencia || !numeroWhatsApp || !ultimoAnoCursado) {
+    if (!nombreCompleto || !edad || !ciudadResidencia || !numeroWhatsApp || !ultimoAnoCursado || !correo) {
       return res.status(400).json({
         success: false,
         message: 'Todos los campos son requeridos'
@@ -61,6 +61,7 @@ app.post('/api/enviar-formulario', async (req, res) => {
         <p>Se ha recibido una nueva inscripción desde el formulario:</p>
         <ul>
           <li><strong>Nombre completo:</strong> ${nombreCompleto}</li>
+          <li><strong>Correo electrónico:</strong> ${correo}</li>
           <li><strong>Edad:</strong> ${edad}</li>
           <li><strong>Ciudad de residencia:</strong> ${ciudadResidencia}</li>
           <li><strong>Número de WhatsApp:</strong> ${numeroWhatsApp}</li>
